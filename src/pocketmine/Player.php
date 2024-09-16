@@ -3403,8 +3403,18 @@ class Player extends Human implements CommandSender, ChunkLoader, IPlayer{
 				//TODO
 				break;
 			case PlayerActionPacket::ACTION_START_FLYING:
+				if (!$this->isFlying()){
+					if(!$this->toggleFlight(true)){
+						$this->sendAbilities();
+					}
+				}
+				break;
 			case PlayerActionPacket::ACTION_STOP_FLYING:
-				//TODO: ignored for now
+				if ($this->isFlying()){
+					if(!$this->toggleFlight(false)){
+						$this->sendAbilities();
+					}
+				}
 				break;
 			case PlayerActionPacket::ACTION_MISSED_SWING:
 				//ignored
