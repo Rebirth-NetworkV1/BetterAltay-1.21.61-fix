@@ -67,7 +67,7 @@ class SkinData{
 		$this->resourcePatch = $resourcePatch;
 		$this->skinImage = $skinImage;
 		$this->animations = $animations;
-		$this->capeImage = $capeImage ?? new SkinImage(0, 0, "");
+	         $this->capeImage = $capeImage ?? new SkinImage(32, 64, str_repeat("\x00", 8192));
 		if(!is_string($geometryData)){
 			$geometryData = "";
 		}
