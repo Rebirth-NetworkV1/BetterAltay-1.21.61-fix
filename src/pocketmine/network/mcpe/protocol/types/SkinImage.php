@@ -41,6 +41,11 @@ class SkinImage {
         ];
 
         $size = strlen($data);
+        if ($size === 0) {
+            // Default to a valid 64x64 blank skin if the data is empty
+            return new self(64, 64, str_repeat("\x00", 64 * 64 * 4));
+        }
+
         if (isset($sizes[$size])) {
             [$width, $height] = $sizes[$size];
             return new self($height, $width, $data);
