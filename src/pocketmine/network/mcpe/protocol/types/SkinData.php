@@ -91,8 +91,8 @@ class SkinData {
     }
 
     private function sanitizeString(string $input): string {
-        return trim(filter_var($input, FILTER_SANITIZE_STRING, FILTER_FLAG_NO_ENCODE_QUOTES));
-    }
+    return trim(filter_var($input, FILTER_SANITIZE_SPECIAL_CHARS));
+}
 
     public function getSkinId(): string {
         return $this->skinId;
