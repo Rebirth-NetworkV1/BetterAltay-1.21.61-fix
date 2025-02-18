@@ -8,62 +8,54 @@ use InvalidArgumentException;
 use function strlen;
 
 class SkinImage {
-    private int $height;
-    private int $width;
-    private string $data;
 
-    public function __construct(int $height, int $width, string $data) {
-        $this->height = max(1, $height);
-        $this->width = max(1, $width);
+    /** @var int */
+    private $height;
+    /** @var int */
+    private $width;
+    /** @var string */
+    private $data;
 
-        // Ensure correct data size
-        $expected = $this->width * $this->height * 4;
-        $actual = strlen($data);
-
-        if ($actual === 0) {
-            throw new InvalidArgumentException("Data cannot be empty. Expected: {$expected} bytes");
+    public function __construct(int $height, int $width, $data){
+        if($height < 0 or $width < 0){
+            $height = 0;
+            $width = 0;
+            $data = "";
         }
-
-        if ($actual !== $expected) {
-            throw new InvalidArgumentException("Invalid skin/cape data size: {$actual} bytes (expected: {$expected} bytes)");
+        if(($expected = $height * $width * 4) !== ($actual = strlen($data))){
+            $data = "";
         }
-
+        $this->height = $height;
+        $this->width = $width;
         $this->data = $data;
     }
 
-    public static function fromLegacy(string $data): SkinImage {
-        $sizes = [
-            64 * 32 * 4 => [64, 32],  // Cape size (8192 bytes)
-            64 * 64 * 4 => [64, 64],
-            128 * 128 * 4 => [128, 128],
-            256 * 128 * 4 => [256, 128],
-            256 * 256 * 4 => [256, 256],
-        ];
-
-        $size = strlen($data);
-        if ($size === 0) {
-            // Default to a valid 64x64 blank skin if the data is empty
-            return new self(64, 64, str_repeat("\x00", 64 * 64 * 4));
+    public static function fromLegacy(string $data) : SkinImage{
+        switch(strlen($data)){
+            case 64 * 32 * 4:
+                return new self(32, 64, $data);
+            case 64 * 64 * 4:
+                return new self(64, 64, $data);
+            case 128 * 128 * 4:
+                return new self(128, 128, $data);
+            case 256 * 128 * 4:
+                return new self(128, 256, $data);
+            case 256 * 256 * 4:
+                return new self(256, 256, $data);
+            default:
+                return new self(0, 0, "");
         }
-
-        if (isset($sizes[$size])) {
-            [$width, $height] = $sizes[$size];
-            return new self($height, $width, $data);
-        }
-
-        // Default to a valid 64x64 blank skin if the data is invalid
-        return new self(64, 64, str_repeat("\x00", 64 * 64 * 4));
     }
 
-    public function getHeight(): int {
+    public function getHeight() : int{
         return $this->height;
     }
 
-    public function getWidth(): int {
+    public function getWidth() : int{
         return $this->width;
     }
 
-    public function getData(): string {
+    public function getData() : string{
         return $this->data;
     }
 }
