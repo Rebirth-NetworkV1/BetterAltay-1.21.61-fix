@@ -811,104 +811,90 @@ class Human extends Creature implements ProjectileSource, InventoryHolder{
 	}
 
 	public function saveNBT() : void{
-    parent::saveNBT();
+		parent::saveNBT();
 
-    $this->namedtag->setInt("foodLevel", (int) $this->getFood(), true);
-    $this->namedtag->setFloat("foodExhaustionLevel", $this->getExhaustion(), true);
-    $this->namedtag->setFloat("foodSaturationLevel", $this->getSaturation(), true);
-    $this->namedtag->setInt("foodTickTimer", (int) $this->foodTickTimer);
+		$this->namedtag->setInt("foodLevel", (int) $this->getFood(), true);
+		$this->namedtag->setFloat("foodExhaustionLevel", $this->getExhaustion(), true);
+		$this->namedtag->setFloat("foodSaturationLevel", $this->getSaturation(), true);
+		$this->namedtag->setInt("foodTickTimer", (int) $this->foodTickTimer);
 
-    $this->namedtag->setInt("XpLevel", $this->getXpLevel());
-    $this->namedtag->setFloat("XpP", $this->getXpProgress());
-    $this->namedtag->setInt("XpTotal", $this->totalXp);
-    $this->namedtag->setInt("XpSeed", $this->xpSeed);
+		$this->namedtag->setInt("XpLevel", $this->getXpLevel());
+		$this->namedtag->setFloat("XpP", $this->getXpProgress());
+		$this->namedtag->setInt("XpTotal", $this->totalXp);
+		$this->namedtag->setInt("XpSeed", $this->xpSeed);
 
-    $inventoryTag = new ListTag("Inventory", [], NBT::TAG_Compound);
-    $this->namedtag->setTag($inventoryTag);
-    if($this->inventory !== null){
-        // Normal inventory
-        $slotCount = $this->inventory->getSize() + $this->inventory->getHotbarSize();
-        for($slot = $this->inventory->getHotbarSize(); $slot < $slotCount; ++$slot){
-            $item = $this->inventory->getItem($slot - 9);
-            if(!$item->isNull()){
-                $inventoryTag->push($item->nbtSerialize($slot));
-            }
-        }
+		$inventoryTag = new ListTag("Inventory", [], NBT::TAG_Compound);
+		$this->namedtag->setTag($inventoryTag);
+		if($this->inventory !== null){
+			//Normal inventory
+			$slotCount = $this->inventory->getSize() + $this->inventory->getHotbarSize();
+			for($slot = $this->inventory->getHotbarSize(); $slot < $slotCount; ++$slot){
+				$item = $this->inventory->getItem($slot - 9);
+				if(!$item->isNull()){
+					$inventoryTag->push($item->nbtSerialize($slot));
+				}
+			}
 
-        // Armor
-        for($slot = 100; $slot < 104; ++$slot){
-            $item = $this->armorInventory->getItem($slot - 100);
-            if(!$item->isNull()){
-                $inventoryTag->push($item->nbtSerialize($slot));
-            }
-        }
+			//Armor
+			for($slot = 100; $slot < 104; ++$slot){
+				$item = $this->armorInventory->getItem($slot - 100);
+				if(!$item->isNull()){
+					$inventoryTag->push($item->nbtSerialize($slot));
+				}
+			}
 
-        $this->namedtag->setInt("SelectedInventorySlot", $this->inventory->getHeldItemIndex());
-    }
+			$this->namedtag->setInt("SelectedInventorySlot", $this->inventory->getHeldItemIndex());
+		}
 
-    if($this->offHandInventory !== null){
-        $this->namedtag->setTag(($this->offHandInventory->getItemInOffHand())->nbtSerialize(-1, "OffHand"));
-    }
+		if($this->offHandInventory !== null){
+			$this->namedtag->setTag(($this->offHandInventory->getItemInOffHand())->nbtSerialize(-1, "OffHand"));
+		}
 
-    if($this->enderChestInventory !== null){
-        /** @var CompoundTag[] $items */
-        $items = [];
+		if($this->enderChestInventory !== null){
+			/** @var CompoundTag[] $items */
+			$items = [];
 
-        $slotCount = $this->enderChestInventory->getSize();
-        for($slot = 0; $slot < $slotCount; ++$slot){
-            $item = $this->enderChestInventory->getItem($slot);
-            if(!$item->isNull()){
-                $items[] = $item->nbtSerialize($slot);
-            }
-        }
+			$slotCount = $this->enderChestInventory->getSize();
+			for($slot = 0; $slot < $slotCount; ++$slot){
+				$item = $this->enderChestInventory->getItem($slot);
+				if(!$item->isNull()){
+					$items[] = $item->nbtSerialize($slot);
+				}
+			}
 
-        $this->namedtag->setTag(new ListTag("EnderChestInventory", $items, NBT::TAG_Compound));
-    }
+			$this->namedtag->setTag(new ListTag("EnderChestInventory", $items, NBT::TAG_Compound));
+		}
 
-    if ($this->skin !== null) {
-        $this->namedtag->setTag(new CompoundTag("Skin", [
-            new StringTag("Name", $this->skin->getSkinId()),
-            new ByteArrayTag("Data", $this->skin->getSkinImage()->getData()),
-            new IntTag("SkinImageHeight", $this->skin->getSkinImage()->getHeight()),
-            new IntTag("SkinImageWidth", $this->skin->getSkinImage()->getWidth()),
-            new ByteArrayTag("CapeData", $this->skin->getCape()->getImage()->getData()),
-            new StringTag("CapeId", $this->skin->getCape()->getId()),
-            new IntTag("CapeImageHeight", $this->skin->getCape()->getImage()->getHeight()),
-            new IntTag("CapeImageWidth", $this->skin->getCape()->getImage()->getWidth()),
-            new ListTag("AnimatedImageData", array_map(function(SkinAnimation $animation) : CompoundTag {
-                return new CompoundTag("", [
-                    new ByteTag("Type", $this->validateByteValue($animation->getType())),
-                    new FloatTag("Frames", $animation->getFrames()),
-                    new ByteTag("ExpressionType", $this->validateByteValue($animation->getExpressionType())),
-                    new ByteArrayTag("Image", $animation->getImage()->getData()),
-                    new IntTag("ImageHeight", $animation->getImage()->getHeight()),
-                    new IntTag("ImageWidth", $animation->getImage()->getWidth())
-                ]);
-            }, $this->skin->getAnimations()), NBT::TAG_Compound),
-            new ByteArrayTag("SkinResourcePatch", $this->skin->getResourcePatch()),
-            new StringTag("GeometryName", $this->skin->getGeometryName()),
-            new ByteArrayTag("GeometryData", $this->skin->getGeometryData()),
-            new ByteArrayTag("SkinAnimationData", $this->skin->getAnimationData()),
-            new ByteTag("PersonaSkin", intval($this->skin->isPersona())),
-            new ByteTag("PremiumSkin", intval($this->skin->isPremium()))
-        ]));
-    }
-}
+		if($this->skin !== null){
+			$this->namedtag->setTag(new CompoundTag("Skin", [
+				new StringTag("Name", $this->skin->getSkinId()),
+				new ByteArrayTag("Data", $this->skin->getSkinImage()->getData()),
+				new IntTag("SkinImageHeight", $this->skin->getSkinImage()->getHeight()),
+				new IntTag("SkinImageWidth", $this->skin->getSkinImage()->getWidth()),
+				new ByteArrayTag("CapeData", $this->skin->getCape()->getImage()->getData()),
+				new StringTag("CapeId", $this->skin->getCape()->getId()),
+				new IntTag("CapeImageHeight", $this->skin->getCape()->getImage()->getHeight()),
+				new IntTag("CapeImageWidth", $this->skin->getCape()->getImage()->getWidth()),
+				new ListTag("AnimatedImageData", array_map(function(SkinAnimation $animation) : CompoundTag{
+					return new CompoundTag("", [
+						new ByteTag("Type", $animation->getType()),
+						new FloatTag("Frames", $animation->getFrames()),
+						new ByteTag("ExpressionType", $animation->getExpressionType()),
+						new ByteArrayTag("Image", $animation->getImage()->getData()),
+						new IntTag("ImageHeight", $animation->getImage()->getHeight()),
+						new IntTag("ImageWidth", $animation->getImage()->getWidth())
+					]);
+				}, $this->skin->getAnimations()), NBT::TAG_Compound),
+				new ByteArrayTag("SkinResourcePatch", $this->skin->getResourcePatch()),
+				new StringTag("GeometryName", $this->skin->getGeometryName()),
+				new ByteArrayTag("GeometryData", $this->skin->getGeometryData()),
+				new ByteArrayTag("SkinAnimationData", $this->skin->getAnimationData()),
+				new ByteTag("PersonaSkin", intval($this->skin->isPersona())),
+				new ByteTag("PremiumSkin", intval($this->skin->isPremium()))
+			]));
+		}
+	}
 
-/**
- * Validates that the given value is within the valid byte range.
- *
- * @param int $value The value to validate.
- * @return int The validated value, defaulting to 0 if out of range.
- */
-private function validateByteValue(int $value): int {
-    if ($value < -128 || $value > 127) {
-        error_log("Invalid byte value: $value. Defaulting to 0.");
-        return 0; // Default value within the byte range
-    }
-    return $value;
-}
-		
 	public function spawnTo(Player $player) : void{
 		if($player !== $this){
 			parent::spawnTo($player);
