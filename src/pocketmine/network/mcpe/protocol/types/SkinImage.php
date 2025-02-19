@@ -7,6 +7,7 @@ namespace pocketmine\network\mcpe\protocol\types;
 use InvalidArgumentException;
 use function is_string;
 use function strlen;
+use function str_repeat;
 
 class SkinImage {
 
@@ -51,7 +52,11 @@ class SkinImage {
             return new self($height, $width, $data);
         }
 
-        throw new InvalidArgumentException("Invalid legacy skin data size: {$size} bytes");
+        // Fallback for invalid sizes: return a blank 64x64 skin
+        $width = 64;
+        $height = 64;
+        $data = str_repeat("\x00", $width * $height * 4);
+        return new self($height, $width, $data);
     }
 
     public function getHeight(): int {
