@@ -831,13 +831,25 @@ class Human extends Creature implements ProjectileSource, InventoryHolder{
             new IntTag("SkinImageWidth", $this->skin->getSkinImage()->getWidth()),
             new ByteArrayTag("CapeData", $this->skin->getCape()->getImage()->getData()),
             new StringTag("CapeId", $this->skin->getCape()->getId()),
-            new IntTag("CapeImageHeight", $this->skin->getCape()->getImage()->getHeight()),
-            new IntTag("CapeImageWidth", $this->skin->getCape()->getImage()->getWidth()),
+            new IntTag("CapeImageHeight", $this->skin->getCape()->getHeight()),
+            new IntTag("CapeImageWidth", $this->skin->getCape()->getWidth()),
             new ListTag("AnimatedImageData", array_map(function(SkinAnimation $animation) : CompoundTag{
+                $type = $animation->getType();
+                if(!is_int($type) || $type < -128 || $type > 127){
+                    error_log("Invalid ByteTag value detected: $type. Resetting to 0.");
+                    $type = 0;
+                }
+
+                $expressionType = $animation->getExpressionType();
+                if(!is_int($expressionType) || $expressionType < -128 || $expressionType > 127){
+                    error_log("Invalid ByteTag ExpressionType detected: $expressionType. Resetting to 0.");
+                    $expressionType = 0;
+                }
+
                 return new CompoundTag("", [
-                    new ByteTag("Type", max(-128, min(127, $animation->getType()))),
+                    new ByteTag("Type", $type),
                     new FloatTag("Frames", $animation->getFrames()),
-                    new ByteTag("ExpressionType", max(-128, min(127, $animation->getExpressionType()))),
+                    new ByteTag("ExpressionType", $expressionType),
                     new ByteArrayTag("Image", $animation->getImage()->getData()),
                     new IntTag("ImageHeight", $animation->getImage()->getHeight()),
                     new IntTag("ImageWidth", $animation->getImage()->getWidth())
@@ -847,8 +859,8 @@ class Human extends Creature implements ProjectileSource, InventoryHolder{
             new StringTag("GeometryName", $this->skin->getGeometryName()),
             new ByteArrayTag("GeometryData", $this->skin->getGeometryData()),
             new ByteArrayTag("SkinAnimationData", $this->skin->getAnimationData()),
-            new ByteTag("PersonaSkin", max(-128, min(127, intval($this->skin->isPersona())))),
-            new ByteTag("PremiumSkin", max(-128, min(127, intval($this->skin->isPremium()))))
+            new ByteTag("PersonaSkin", $this->skin->isPersona() ? 1 : 0),
+            new ByteTag("PremiumSkin", $this->skin->isPremium() ? 1 : 0)
         ]));
     }
 }
