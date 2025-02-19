@@ -3829,36 +3829,35 @@ class Player extends Human implements CommandSender, ChunkLoader, IPlayer{
 	 * @return bool|int
 	 */
 	public function sendDataPacket(DataPacket $packet, bool $needACK = false, bool $immediate = false){
-		if(!$this->isConnected()){
-			return false;
-		}
+    if(!$this->isConnected()){
+        return false;
+    }
 
-		//Basic safety restriction. TODO: improve this
-		if(!$this->loggedIn and !$packet->canBeSentBeforeLogin()){
-			throw new InvalidArgumentException("Attempted to send " . get_class($packet) . " to " . $this->getName() . " too early");
-		}
+    if(!$this->loggedIn && !$packet->canBeSentBeforeLogin()){
+        return false; // Block the packet silently
+    }
 
-		$timings = Timings::getSendDataPacketTimings($packet);
-		$timings->startTiming();
-		try{
-			$ev = new DataPacketSendEvent($this, $packet);
-			$ev->call();
-			if($ev->isCancelled()){
-				return false;
-			}
+    $timings = Timings::getSendDataPacketTimings($packet);
+    $timings->startTiming();
+    try {
+        $ev = new DataPacketSendEvent($this, $packet);
+        $ev->call();
+        if($ev->isCancelled()){
+            return false;
+        }
 
-			$identifier = $this->interface->putPacket($this, $packet, $needACK, $immediate);
+        $identifier = $this->interface->putPacket($this, $packet, $needACK, $immediate);
 
-			if($needACK and $identifier !== null){
-				$this->needACK[$identifier] = false;
-				return $identifier;
-			}
+        if($needACK && $identifier !== null){
+            $this->needACK[$identifier] = false;
+            return $identifier;
+        }
 
-			return true;
-		}finally{
-			$timings->stopTiming();
-		}
-	}
+        return true;
+    } finally {
+        $timings->stopTiming();
+    }
+}
 
 	/**
 	 * @internal
