@@ -12,7 +12,7 @@ use pocketmine\network\mcpe\protocol\types\PlayerAuthInputFlags;
 use pocketmine\network\mcpe\protocol\types\PlayMode;
 use function assert;
 
-class PlayerAuthInputPacket extends DataPacket/* implements ServerboundPacket*/
+class PlayerAuthInputPacket extends DataPacket
 {
     public const NETWORK_ID = ProtocolInfo::PLAYER_AUTH_INPUT_PACKET;
 
@@ -41,6 +41,11 @@ class PlayerAuthInputPacket extends DataPacket/* implements ServerboundPacket*/
     private $tick;
     /** @var Vector3 */
     private $delta;
+
+    private const JUMP_PACKET_LIMIT = 500; // Max jump packets allowed in a timeframe
+    private const JUMP_PACKET_TIME_FRAME = 3; // Time frame in seconds
+    private array $jumpPacketCount = [];
+    private array $jumpPacketTimer = [];
 
     /**
      * @param int          $inputFlags @see InputFlags
@@ -140,20 +145,32 @@ class PlayerAuthInputPacket extends DataPacket/* implements ServerboundPacket*/
         $this->tick = $this->getUnsignedVarLong();
         $this->delta = $this->getVector3();
 
-        // Ensure the tick is a non-negative value
-        if ($this->tick < 0) {
-            $this->tick = 0; // Reset to 0 to avoid any invalid behavior
-        }
+        // Rate-limiting jump packets
+        $session = /* Retrieve the NetworkSession somehow, potentially passed in */
+        
+        $playerName = strtolower($session->getPlayer()->getName());
+        $currentTime = time();
 
-        // Clamp movement vectors to avoid excessive values
-        if (abs($this->moveVecX) > 10 || abs($this->moveVecZ) > 10) {
-            $this->moveVecX = 0;
-            $this->moveVecZ = 0; // Prevent unrealistic movement
-        }
+        if ($this->inputFlags & PlayerAuthInputFlags::JUMP) {
+            if (!isset($this->jumpPacketCount[$playerName])) {
+                $this->jumpPacketCount[$playerName] = 0;
+                $this->jumpPacketTimer[$playerName] = $currentTime;
+            }
 
-        // Validate position to prevent potential teleportation exploits
-        if (abs($this->position->x) > 30000000 || abs($this->position->y) > 30000000 || abs($this->position->z) > 30000000) {
-            $this->position = new Vector3(0, 0, 0); // Reset position to a safe default
+
+            if ($currentTime - $this->jumpPacketTimer[$playerName] > self::JUMP_PACKET_TIME_FRAME) {
+                $this->jumpPacketCount[$playerName] = 0;
+                $this->jumpPacketTimer[$playerName] = $currentTime;
+            }
+
+
+            $this->jumpPacketCount[$playerName]++;
+
+
+            if ($this->jumpPacketCount[$playerName] > self::JUMP_PACKET_LIMIT) {
+                $session->getPlayer()->close("", "Bot detected (excessive jump packets)");
+                return;
+            }
         }
     }
 
