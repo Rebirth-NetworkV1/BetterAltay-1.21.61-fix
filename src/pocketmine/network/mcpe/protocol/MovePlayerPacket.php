@@ -1,97 +1,115 @@
 <?php
 
-/*
- *
- *  ____            _        _   __  __ _                  __  __ ____
- * |  _ \ ___   ___| | _____| |_|  \/  (_)_ __   ___      |  \/  |  _ \
- * | |_) / _ \ / __| |/ / _ \ __| |\/| | | '_ \ / _ \_____| |\/| | |_) |
- * |  __/ (_) | (__|   <  __/ |_| |  | | | | | |  __/_____| |  | |  __/
- * |_|   \___/ \___|_|\_\___|\__|_|  |_|_|_| |_|\___|     |_|  |_|_|
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * @author PocketMine Team
- * @link http://www.pocketmine.net/
- *
- *
-*/
-
 declare(strict_types=1);
 
 namespace pocketmine\network\mcpe\protocol;
 
-#include <rules/DataPacket.h>
-
 use pocketmine\math\Vector3;
 use pocketmine\network\mcpe\NetworkSession;
 
-class MovePlayerPacket extends DataPacket{
-	public const NETWORK_ID = ProtocolInfo::MOVE_PLAYER_PACKET;
+class MovePlayerPacket extends DataPacket {
+    public const NETWORK_ID = ProtocolInfo::MOVE_PLAYER_PACKET;
 
-	public const MODE_NORMAL = 0;
-	public const MODE_RESET = 1;
-	public const MODE_TELEPORT = 2;
-	public const MODE_PITCH = 3; //facepalm Mojang
+    public const MODE_NORMAL = 0;
+    public const MODE_RESET = 1;
+    public const MODE_TELEPORT = 2;
+    public const MODE_PITCH = 3;
 
-	/** @var int */
-	public $entityRuntimeId;
-	/** @var Vector3 */
-	public $position;
-	/** @var float */
-	public $pitch;
-	/** @var float */
-	public $yaw;
-	/** @var float */
-	public $headYaw;
-	/** @var int */
-	public $mode = self::MODE_NORMAL;
-	/** @var bool */
-	public $onGround = false; //TODO
-	/** @var int */
-	public $ridingEid = 0;
-	/** @var int */
-	public $teleportCause = 0;
-	/** @var int */
-	public $teleportItem = 0;
-	/** @var int */
-	public $tick = 0;
+    private const MAX_Y_CHANGE = 6.0; // Maximum vertical movement 
+    private const MAX_XZ_CHANGE = 5.0; // Maximum horizontal movement
+    private const MAX_POSITION_VALUE = 30000000; // Max valid coordinate to prevent out-of-bounds exploits
+    private const MOVEMENT_TIMEOUT = 10; // Time (in seconds) between valid movement packets
+    
+    private array $lastMovementTime = [];
 
-	protected function decodePayload(){
-		$this->entityRuntimeId = $this->getEntityRuntimeId();
-		$this->position = $this->getVector3();
-		$this->pitch = $this->getLFloat();
-		$this->yaw = $this->getLFloat();
-		$this->headYaw = $this->getLFloat();
-		$this->mode = $this->getByte();
-		$this->onGround = $this->getBool();
-		$this->ridingEid = $this->getEntityRuntimeId();
-		if($this->mode === MovePlayerPacket::MODE_TELEPORT){
-			$this->teleportCause = $this->getLInt();
-			$this->teleportItem = $this->getLInt();
-		}
-		$this->tick = $this->getUnsignedVarLong();
-	}
+    /** @var int */
+    public $entityRuntimeId;
+    /** @var Vector3 */
+    public $position;
+    /** @var float */
+    public $pitch;
+    /** @var float */
+    public $yaw;
+    /** @var float */
+    public $headYaw;
+    /** @var int */
+    public $mode = self::MODE_NORMAL;
+    /** @var bool */
+    public $onGround = false;
+    /** @var int */
+    public $ridingEid = 0;
+    /** @var int */
+    public $teleportCause = 0;
+    /** @var int */
+    public $teleportItem = 0;
+    /** @var int */
+    public $tick = 0;
 
-	protected function encodePayload(){
-		$this->putEntityRuntimeId($this->entityRuntimeId);
-		$this->putVector3($this->position);
-		$this->putLFloat($this->pitch);
-		$this->putLFloat($this->yaw);
-		$this->putLFloat($this->headYaw); //TODO
-		$this->putByte($this->mode);
-		$this->putBool($this->onGround);
-		$this->putEntityRuntimeId($this->ridingEid);
-		if($this->mode === MovePlayerPacket::MODE_TELEPORT){
-			$this->putLInt($this->teleportCause);
-			$this->putLInt($this->teleportItem);
-		}
-		$this->putUnsignedVarLong($this->tick);
-	}
+    protected function decodePayload() {
+        $this->entityRuntimeId = $this->getEntityRuntimeId();
+        $this->position = $this->getVector3();
+        $this->pitch = $this->getLFloat();
+        $this->yaw = $this->getLFloat();
+        $this->headYaw = $this->getLFloat();
+        $this->mode = $this->getByte();
+        $this->onGround = $this->getBool();
+        $this->ridingEid = $this->getEntityRuntimeId();
+        if ($this->mode === self::MODE_TELEPORT) {
+            $this->teleportCause = $this->getLInt();
+            $this->teleportItem = $this->getLInt();
+        }
+        $this->tick = $this->getUnsignedVarLong();
 
-	public function handle(NetworkSession $session) : bool{
-		return $session->handleMovePlayer($this);
-	}
+        $session = /* Retrieve NetworkSession */;
+        $player = $session->getPlayer();
+        if (!$player) return;
+
+        $playerName = strtolower($player->getName());
+        $currentTime = time();
+
+        if (abs($this->position->x) > self::MAX_POSITION_VALUE || abs($this->position->y) > self::MAX_POSITION_VALUE || abs($this->position->z) > self::MAX_POSITION_VALUE) {
+            $session->getPlayer()->close("", "Invalid position data detected (Out-of-bounds)");
+            return;
+        }
+
+        if (isset($this->lastMovementTime[$playerName])) {
+            $lastMoveTime = $this->lastMovementTime[$playerName];
+            if ($currentTime - $lastMoveTime < self::MOVEMENT_TIMEOUT) {
+                $session->getPlayer()->close("", "Flooding detected (too many movement packets)");
+                return;
+            }
+        }
+
+        $this->lastMovementTime[$playerName] = $currentTime;
+
+        if (abs($this->position->y - $player->getPosition()->y) > self::MAX_Y_CHANGE) {
+            $session->getPlayer()->close("", "Excessive vertical movement detected");
+            return;
+        }
+
+        if (abs($this->position->x - $player->getPosition()->x) > self::MAX_XZ_CHANGE || abs($this->position->z - $player->getPosition()->z) > self::MAX_XZ_CHANGE) {
+            $session->getPlayer()->close("", "Excessive horizontal movement detected");
+            return;
+        }
+    }
+
+    protected function encodePayload() {
+        $this->putEntityRuntimeId($this->entityRuntimeId);
+        $this->putVector3($this->position);
+        $this->putLFloat($this->pitch);
+        $this->putLFloat($this->yaw);
+        $this->putLFloat($this->headYaw);
+        $this->putByte($this->mode);
+        $this->putBool($this->onGround);
+        $this->putEntityRuntimeId($this->ridingEid);
+        if ($this->mode === self::MODE_TELEPORT) {
+            $this->putLInt($this->teleportCause);
+            $this->putLInt($this->teleportItem);
+        }
+        $this->putUnsignedVarLong($this->tick);
+    }
+
+    public function handle(NetworkSession $session) : bool {
+        return $session->handleMovePlayer($this);
+    }
 }
