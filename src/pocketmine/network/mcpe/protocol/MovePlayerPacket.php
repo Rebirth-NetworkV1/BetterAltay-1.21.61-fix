@@ -18,7 +18,7 @@ class MovePlayerPacket extends DataPacket {
     private const MAX_Y_CHANGE = 6.0; // Prevents teleport hacks
     private const MAX_XZ_CHANGE = 5.0; // Prevents speed hacks
     private const MAX_POSITION_VALUE = 30000000; // Prevents out-of-bounds exploits
-    private const MOVEMENT_TIMEOUT = 10; // Time in seconds (anti-flood)
+    private const MOVEMENT_TIMEOUT = 10; 
 
     private static array $lastMovementTime = [];
 
@@ -83,7 +83,7 @@ class MovePlayerPacket extends DataPacket {
     }
 
     private function validateMovement(NetworkSession $session): void {
-        $player = $session->getHandler()->getPlayer();
+        $player = $session->getPlayer();
         if (!$player) return;
 
         $playerName = strtolower($player->getName());
