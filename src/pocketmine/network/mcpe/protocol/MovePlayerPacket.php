@@ -78,20 +78,20 @@ class MovePlayerPacket extends DataPacket {
     }
 
     public function handle(NetworkSession $session) : bool {
+        // Validate the movement and cancel if invalid
         $this->validateMovement($session);
-        return $session->handleMovePlayer($this);
+        return true; // Allow the packet to be handled normally by the session
     }
 
     private function validateMovement(NetworkSession $session): void {
-        $player = $session->getPlayer();
+        $player = $session->getPlayerEntity();
         if (!$player) return;
 
-        $playerName = strtolower($player->getName());
         $currentTime = time();
 
         // Prevent null or invalid positions
         if ($this->position === null || !($this->position instanceof Vector3)) {
-            $player->close("", "Invalid movement data");
+            $session->cancel();  // Cancel movement packet
             return;
         }
 
@@ -99,15 +99,16 @@ class MovePlayerPacket extends DataPacket {
         if (abs($this->position->x) > self::MAX_POSITION_VALUE || 
             abs($this->position->y) > self::MAX_POSITION_VALUE || 
             abs($this->position->z) > self::MAX_POSITION_VALUE) {
-            $player->close("", "Invalid position data detected");
+            $session->cancel();  // Cancel movement packet
             return;
         }
 
         // Flood protection (anti-spam)
+        $playerName = strtolower($player->getName());
         if (isset(self::$lastMovementTime[$playerName])) {
             $lastMoveTime = self::$lastMovementTime[$playerName];
             if ($currentTime - $lastMoveTime < self::MOVEMENT_TIMEOUT) {
-                $player->close("", "Flooding detected (too many movement packets)");
+                $session->cancel();  // Cancel movement packet
                 return;
             }
         }
@@ -115,14 +116,14 @@ class MovePlayerPacket extends DataPacket {
 
         // Prevent extreme vertical movement
         if (abs($this->position->y - $player->getPosition()->y) > self::MAX_Y_CHANGE) {
-            $player->close("", "Excessive vertical movement detected");
+            $session->cancel();  // Cancel movement packet
             return;
         }
 
         // Prevent extreme horizontal movement
         if (abs($this->position->x - $player->getPosition()->x) > self::MAX_XZ_CHANGE || 
             abs($this->position->z - $player->getPosition()->z) > self::MAX_XZ_CHANGE) {
-            $player->close("", "Excessive horizontal movement detected");
+            $session->cancel();  // Cancel movement packet
             return;
         }
     }
