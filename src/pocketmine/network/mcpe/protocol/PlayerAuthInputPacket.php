@@ -16,43 +16,31 @@ class PlayerAuthInputPacket extends DataPacket
 {
     public const NETWORK_ID = ProtocolInfo::PLAYER_AUTH_INPUT_PACKET;
 
-    /** @var Vector3 */
-    private $position;
-    /** @var float */
-    private $pitch;
-    /** @var float */
-    private $yaw;
-    /** @var float */
-    private $headYaw;
-    /** @var float */
-    private $moveVecX;
-    /** @var float */
-    private $moveVecZ;
-    /** @var int */
-    private $inputFlags;
-    /** @var int */
-    private $inputMode;
-    /** @var int */
-    private $playMode;
+    private Vector3 $position;
+    private float $pitch;
+    private float $yaw;
+    private float $headYaw;
+    private float $moveVecX;
+    private float $moveVecZ;
+    private int $inputFlags;
+    private int $inputMode;
+    private int $playMode;
     private int $interactionMode;
-    /** @var Vector3|null */
-    private $vrGazeDirection = null;
-    /** @var int */
-    private $tick;
-    /** @var Vector3 */
-    private $delta;
+    private ?Vector3 $vrGazeDirection = null;
+    private int $tick;
+    private Vector3 $delta;
 
     private const JUMP_PACKET_LIMIT = 500;
     private const JUMP_PACKET_TIME_FRAME = 3; 
-    private array $jumpPacketCount = [];
-    private array $jumpPacketTimer = [];
+    private static array $jumpPacketCount = [];
+    private static array $jumpPacketTimer = [];
 
     public static function create(Vector3 $position, float $pitch, float $yaw, float $headYaw, float $moveVecX, float $moveVecZ, int $inputFlags, int $inputMode, int $playMode, int $interactionMode, ?Vector3 $vrGazeDirection, int $tick, Vector3 $delta) : self {
         if ($playMode === PlayMode::VR && $vrGazeDirection === null) {
             throw new InvalidArgumentException("Gaze direction must be provided for VR play mode");
         }
         $result = new self;
-        $result->position = $position->asVector3();
+        $result->position = $position;
         $result->pitch = $pitch;
         $result->yaw = $yaw;
         $result->headYaw = $headYaw;
@@ -62,9 +50,7 @@ class PlayerAuthInputPacket extends DataPacket
         $result->inputMode = $inputMode;
         $result->playMode = $playMode;
         $result->interactionMode = $interactionMode;
-        if ($vrGazeDirection !== null) {
-            $result->vrGazeDirection = $vrGazeDirection->asVector3();
-        }
+        $result->vrGazeDirection = $vrGazeDirection;
         $result->tick = $tick;
         $result->delta = $delta;
         return $result;
@@ -86,36 +72,6 @@ class PlayerAuthInputPacket extends DataPacket
         }
         $this->tick = $this->getUnsignedVarLong();
         $this->delta = $this->getVector3();
-
-        // Handling Jump Packet Limitations
-        $session = /* Retrieve the NetworkSession */;
-        $playerName = strtolower($session->getPlayer()->getName());
-        $currentTime = time();
-
-        // **Ignore Small Y Movements on Slabs**
-        if ($this->delta->y > 0 && $this->delta->y <= 0.6) {
-            return; // Slabs and stairs should NOT count as jumps
-        }
-
-        if ($this->inputFlags & PlayerAuthInputFlags::JUMP && $this->delta->y > 0.42) { 
-            // Only count actual jumps, not stepping onto slabs
-            if (!isset($this->jumpPacketCount[$playerName])) {
-                $this->jumpPacketCount[$playerName] = 0;
-                $this->jumpPacketTimer[$playerName] = $currentTime;
-            }
-
-            if ($currentTime - $this->jumpPacketTimer[$playerName] > self::JUMP_PACKET_TIME_FRAME) {
-                $this->jumpPacketCount[$playerName] = 0;
-                $this->jumpPacketTimer[$playerName] = $currentTime;
-            }
-
-            $this->jumpPacketCount[$playerName]++;
-
-            if ($this->jumpPacketCount[$playerName] > self::JUMP_PACKET_LIMIT) {
-                $session->getPlayer()->close("", "Bot detected (excessive jump packets)");
-                return;
-            }
-        }
     }
 
     protected function encodePayload() : void {
@@ -138,6 +94,38 @@ class PlayerAuthInputPacket extends DataPacket
     }
 
     public function handle(NetworkSession $session) : bool {
+        $this->validateJumpPackets($session);
         return $session->handlePlayerAuthInput($this);
+    }
+
+    private function validateJumpPackets(NetworkSession $session): void {
+        $player = $session->getPlayer();
+        if (!$player) return;
+
+        $playerName = strtolower($player->getName());
+        $currentTime = time();
+
+        // Ignore small Y movements on slabs
+        if ($this->delta->y > 0 && $this->delta->y <= 0.6) {
+            return; // Slabs and stairs should NOT count as jumps
+        }
+
+        if ($this->inputFlags & PlayerAuthInputFlags::JUMP && $this->delta->y > 0.42) { 
+            if (!isset(self::$jumpPacketCount[$playerName])) {
+                self::$jumpPacketCount[$playerName] = 0;
+                self::$jumpPacketTimer[$playerName] = $currentTime;
+            }
+
+            if ($currentTime - self::$jumpPacketTimer[$playerName] > self::JUMP_PACKET_TIME_FRAME) {
+                self::$jumpPacketCount[$playerName] = 0;
+                self::$jumpPacketTimer[$playerName] = $currentTime;
+            }
+
+            self::$jumpPacketCount[$playerName]++;
+
+            if (self::$jumpPacketCount[$playerName] > self::JUMP_PACKET_LIMIT) {
+                $player->close("", "Bot detected (excessive jump packets)");
+            }
+        }
     }
 }
