@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+# packet deprecated
 
 namespace pocketmine\network\mcpe\protocol;
 
